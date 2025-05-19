@@ -15,6 +15,11 @@ Training in progress, results will be released once finished.
 `trianQP.py`: file that implements with Quadratic Programming
 
 ---
+### Log
+**2025/05/19:** The Quadratic Programming works well, but the model with Trajectory Optimization goes worse.
+
+
+---
 
 ### RelatedLink
 
