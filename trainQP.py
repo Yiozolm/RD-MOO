@@ -18,7 +18,6 @@ from models import *
 
 warnings.filterwarnings("ignore")
 
-
 torch.backends.cudnn.enabled = False 
 
 def configure_optimizers(model, args):
@@ -60,7 +59,7 @@ class RateDistortionLoss(nn.Module):
         self.mse = nn.MSELoss()
         self.lmbda = lmbda
 
-    def forward(self, output, target, type='train'):
+    def forward(self, output, target):
         N, C, H, W = target.size()
         out = {}
         num_pixels = N * H * W
@@ -74,12 +73,7 @@ class RateDistortionLoss(nn.Module):
 
         out["loss"] = out["distortion"] + out["bpp_loss"]
 
-
         return out
-
-def combine_gradients(grads_rate, grads_dist, weights):
-    """Combine two gradient lists using given weights (Solution 1 or 2)."""
-    return [weights[0] * g1 + weights[1] * g2 for g1, g2 in zip(grads_rate, grads_dist)]
 
 
 def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer, train_step, tb_writer=None,
@@ -96,7 +90,7 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
 
         out = model(x)
 
-        out_criterion = criterion(out, x, type='train')
+        out_criterion = criterion(out, x)
         # out_criterion["loss"].backward()
 
         # --- 3. Get gradients for rate ---
@@ -124,20 +118,21 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
         Q_inv = torch.inverse(Q + 1e-8 * torch.eye(2, device=v1.device))
         lam = 1.0 / (one @ Q_inv @ one)
         w = lam * (Q_inv @ one)
-        weights = F.softmax(w, dim=0)
+        w = F.softmax(w, dim=0)
         # Example: If implementing Solution 1 or 2, update weights each step
 
         # --- 6. Combine gradients ---
-        combined_grads = combine_gradients(grads_rate, grads_dist, weights)
+        c_t = 1.0 / (w[0] / (out_criterion["bpp_loss"].item() + eps) + w[1] / (out_criterion["distortion"].item() + eps))
+        dt = [w[0] * g1 + w[1] * g2 for g1, g2 in zip(grads_rate, grads_dist)]
+        dt = [c_t * d for d in dt]
 
         # --- 7. Set combined gradients to each parameter ---
-        for p, g in zip(model.parameters(), combined_grads):
+        for p, g in zip(model.parameters(), dt):
             p.grad = g.clone()
 
 
         if clip_max_norm:
             nn.utils.clip_grad_norm_(model.parameters(), clip_max_norm)
-        # optimizer.step(out_criterion["bpp_loss"], out_criterion["mse_loss"])
         optimizer.step()
 
         if torch.cuda.device_count() > 1:
@@ -149,10 +144,8 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
 
         train_step += 1
         if tb_writer and train_step % 10 == 1:
-            # tb_writer.add_scalar('train origin loss', out_criterion["origin_loss"].item(), train_step)
             tb_writer.add_scalar('train loss', out_criterion["loss"].item(), train_step)
             tb_writer.add_scalar('train mse', out_criterion["mse_loss"].item(), train_step)
-            # tb_writer.add_scalar('train wasserstein Distance', out_criterion["wasserstein"].item(), train_step)
             tb_writer.add_scalar('train img bpp', out_criterion["bpp_loss"].item(), train_step)
             if torch.cuda.device_count() > 1:
                 tb_writer.add_scalar('train aux', model.module.aux_loss().item(), train_step)
@@ -164,7 +157,6 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
 
     print("train sz:{}".format(train_size))
     return train_step
-
 
 def eval_epoch(model, criterion, eval_dataloader, epoch, tb_writer=None):
     model.eval()
@@ -186,7 +178,7 @@ def eval_epoch(model, criterion, eval_dataloader, epoch, tb_writer=None):
             x = x.to('cuda').contiguous()
 
             out = model(x)
-            out_criterion = criterion(out, x, type='eval')
+            out_criterion = criterion(out, x)
 
             N, _, H, W = x.shape
 
@@ -236,16 +228,6 @@ def save_checkpoint(state, is_best, filename):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.")
-    # parser.add_argument(
-    #     "-m",
-    #     "--model",
-    #     default="stf",
-    #     choices=models.keys(),
-    #     help="Model architecture (default: %(default)s)",
-    # )
-    # parser.add_argument(
-    #     "-d", "--dataset", type=str, required=True, help="dataset", default='../fiftyone/open-images-v6'
-    # )
 
     parser.add_argument(
         "-e",
@@ -391,7 +373,6 @@ def main(argv):
         pin_memory=(device == "cuda"),
     )
 
-    # net = models[args.model]()
     net = DemoCompressionModel()
     # Wrap the model with DataParallel
     if torch.cuda.device_count() > 1:

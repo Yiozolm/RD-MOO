@@ -61,7 +61,7 @@ class RateDistortionLoss(nn.Module):
         self.mse = nn.MSELoss()
         self.lmbda = lmbda
 
-    def forward(self, output, target, type='train'):
+    def forward(self, output, target):
         N, C, H, W = target.size()
         out = {}
         num_pixels = N * H * W
@@ -143,14 +143,13 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
         optimizer.step()
 
         # (8) Update trajectory weights (Solution 1 coarse-to-fine step)
-        trajectory_state.update(loss_rate, loss_dist, loss_rate, loss_dist)
+
+        updated_out = model(x)
+        updated_criterion = criterion(updated_out, x)
+
+        trajectory_state.update(loss_rate, loss_dist, updated_criterion['bpp_loss'], updated_criterion["distortion"])
 
         # --------- Aux loss/optimizer (as before) --------- #
-
-
-        # if clip_max_norm:
-        #     nn.utils.clip_grad_norm_(model.parameters(), clip_max_norm)
-        optimizer.step()
 
         if torch.cuda.device_count() > 1:
             aux_loss = model.module.aux_loss()
@@ -161,16 +160,13 @@ def train_one_epoch(model, criterion, train_dataloader, optimizer, aux_optimizer
 
         train_step += 1
         if tb_writer and train_step % 10 == 1:
-            # tb_writer.add_scalar('train origin loss', out_criterion["origin_loss"].item(), train_step)
             tb_writer.add_scalar('train loss', out_criterion["loss"].item(), train_step)
             tb_writer.add_scalar('train mse', out_criterion["mse_loss"].item(), train_step)
-            # tb_writer.add_scalar('train wasserstein Distance', out_criterion["wasserstein"].item(), train_step)
             tb_writer.add_scalar('train img bpp', out_criterion["bpp_loss"].item(), train_step)
             if torch.cuda.device_count() > 1:
                 tb_writer.add_scalar('train aux', model.module.aux_loss().item(), train_step)
             else:
                 tb_writer.add_scalar('train aux', model.aux_loss().item(), train_step)
-            
 
         train_size += x.shape[0]
 
@@ -198,7 +194,7 @@ def eval_epoch(model, criterion, eval_dataloader, epoch, tb_writer=None):
             x = x.to('cuda').contiguous()
 
             out = model(x)
-            out_criterion = criterion(out, x, type='eval')
+            out_criterion = criterion(out, x)
 
             N, _, H, W = x.shape
 
