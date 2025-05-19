@@ -2,22 +2,21 @@
 
 Unofficial Pytorch implementation of **CVPR2025** paper **Balanced Rate-Distortion Optimization in Learned Image Compression**.
 
-Code offered by ChatGPT4.1, haven't tested or modified yet.
+Code offered by ChatGPT4.1, neither tested nor modified yet.
+
+Training in progress, results will be released once finished.  
 
 ---
 
 ### How to use
 
-``` python
-# model = ... (your compression model)
-# optimizer = BalancedRDTrajectoryOptimizer(model.parameters(), lr=1e-4)
-# or
-# optimizer = BalancedRDQPSolverOptimizer(model.parameters(), lr=1e-4)
+`trainTJ.py`: file that implements with Trajectory Optimization
 
-for data in dataloader:
-    # ... prepare input, forward pass, compute rate and distortion losses ...
-    # loss_rate = ...
-    # loss_dist = ...
-    optimizer.step(loss_rate, loss_dist)
+`trianQP.py`: file that implements with Quadratic Programming
 
-```
+---
+
+### RelatedLink
+
+- Paper Link: https://arxiv.org/abs/2502.20161
+- Author Github Lnk: https://github.com/1chizhang
