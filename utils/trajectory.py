@@ -18,9 +18,15 @@ class BalancedRDTrajectoryState:
         """
         Update weights given current/next rate and distortion losses (scalars).
         """
-        delta = torch.stack([
+        # Step 1: log-diff vector
+        v = torch.stack([
             torch.log(loss_rate.detach()) - torch.log(loss_rate_next.detach()),
             torch.log(loss_dist.detach()) - torch.log(loss_dist_next.detach())
         ]).to(self.xi.device)
+        # Step 2: Jacobian of softmax
+        w = self.weights  # (2,)
+        J = torch.diag(w) - w.unsqueeze(1) @ w.unsqueeze(0)  # shape (2,2)
+        # Step 3: Full update with the Jacobian
+        delta = J @ v
         self.xi = self.xi - self.beta * (delta + self.gamma * self.xi)
-        self.weights = F.softmax(self.xi, dim=0)
+        self.weights = torch.softmax(self.xi, dim=0)
