@@ -7,6 +7,11 @@ Code offered by ChatGPT4.1, neither tested nor modified yet.
 Training in progress, results will be released once finished.  
 
 ---
+### Implement Detail
+
+`python 3.9`, `torch 1.11`
+
+---
 
 ### How to use
 
@@ -16,6 +21,8 @@ Training in progress, results will be released once finished.
 
 ---
 ### Log
+**2025/05/20:** Seems the aforementioned problem still not solved, and experiment results are very strange, might need the official code.
+
 **2025/05/19:** ~~The Quadratic Programming works well, but the model with Trajectory Optimization goes worse.~~ **Fixed**
 
 
