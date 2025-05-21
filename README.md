@@ -21,6 +21,8 @@ Training in progress, results will be released once finished.
 
 ---
 ### Log
+**2025/05/21:** Trajectory Optimization results go crazy and Quadratic Programming doesn't work as expected.
+
 **2025/05/20:** Seems the aforementioned problem still not solved, and experiment results are very strange, might need the official code.
 
 **2025/05/19:** ~~The Quadratic Programming works well, but the model with Trajectory Optimization goes worse.~~ **Fixed**
